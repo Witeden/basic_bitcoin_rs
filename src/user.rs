@@ -143,20 +143,18 @@ impl TxGenerator {
     }
 
     pub fn generate_random_tx(&mut self) {
-        loop {
-            let mut payer_idx = self.pick_random_user();
-            let mut payer_balance = self.users[payer_idx].balance;
-            while self.users[payer_idx].balance == 0 {
-                payer_idx = self.pick_random_user();
-                payer_balance = self.users[payer_idx].balance;
-            }
-            let value = rand::thread_rng().gen_range(1..=payer_balance);
-            let mut receiver_idx = self.pick_random_user();
-            while receiver_idx == payer_idx {
-                receiver_idx = self.pick_random_user();
-            }
-            self.execute_tx(payer_idx, receiver_idx, value);
+        let mut payer_idx = self.pick_random_user();
+        let mut payer_balance = self.users[payer_idx].balance;
+        while self.users[payer_idx].balance == 0 {
+            payer_idx = self.pick_random_user();
+            payer_balance = self.users[payer_idx].balance;
         }
+        let value = rand::thread_rng().gen_range(1..=payer_balance);
+        let mut receiver_idx = self.pick_random_user();
+        while receiver_idx == payer_idx {
+            receiver_idx = self.pick_random_user();
+        }
+        self.execute_tx(payer_idx, receiver_idx, value);
     }
 
     pub fn broadcast_txs(&mut self) -> TxBook {
