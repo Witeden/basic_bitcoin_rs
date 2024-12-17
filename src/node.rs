@@ -5,13 +5,11 @@ use crate::transaction::TxBook;
 use std::collections::HashSet;
 use std::sync::mpsc::SendError;
 use std::sync::{mpsc, Arc, Mutex};
-
 #[derive(Debug)]
 pub struct Node {
     /// Mining entity. A node has a local blockchain, and a set of current transactions for which
     /// it is mining. The set of local transactions may be updated when a set of new transactions is broadcasted.
     /// Mining is ran in a thread, and the blockchain is ultimately sent to a master via a channel.
-    id: u64,
     local_bc: Blockchain,
     current_txs: TxBook,
     nonce_start: u64,
@@ -22,14 +20,12 @@ pub struct Node {
 
 impl Node {
     pub fn new(
-        id: u64,
         nonce_start: u64,
         stop_signal: Arc<Mutex<bool>>,
         tx_channel: mpsc::Receiver<TxBook>,
         bc_channel: mpsc::Sender<Blockchain>,
     ) -> Self {
         Self {
-            id,
             local_bc: Blockchain::new(),
             current_txs: TxBook::default(),
             nonce_start: nonce_start,
@@ -220,7 +216,7 @@ mod tests {
         let stop_signal = Arc::new(Mutex::new(false));
         let (_, tx_receiver) = mpsc::channel();
         let (bc_sender, _) = mpsc::channel();
-        let node = Node::new(0, 0, stop_signal, tx_receiver, bc_sender);
+        let node = Node::new(0, stop_signal, tx_receiver, bc_sender);
         let extracted_txbook = node.extract_valid_txs(&generator.txbook);
 
         assert_eq!(generator.txbook.book, extracted_txbook.book);
@@ -233,7 +229,7 @@ mod tests {
         let stop_signal = Arc::new(Mutex::new(false));
         let (tx_sender, tx_receiver) = mpsc::channel();
         let (bc_sender, bc_receiver) = mpsc::channel();
-        let mut node = Node::new(0, 0, Arc::clone(&stop_signal), tx_receiver, bc_sender);
+        let mut node = Node::new(0, Arc::clone(&stop_signal), tx_receiver, bc_sender);
         let handle = thread::spawn(move || node.start_mining());
         generator.execute_tx(0, 1, 50);
         generator.execute_tx(1, 0, 25);
@@ -248,9 +244,9 @@ mod tests {
         assert!(received_bc.is_ok());
         let blockchain = received_bc.unwrap();
 
-            assert!(blockchain.last().is_some());
+        assert!(blockchain.last().is_some());
         let last_block = blockchain.last().unwrap();
-            assert_eq!(last_block.transactions, tx_list);
-            assert!(hash_to_hex_string(&last_block.hash()).starts_with(DIFFICULTY_PREFIX));
+        assert_eq!(last_block.transactions, tx_list);
+        assert!(hash_to_hex_string(&last_block.hash()).starts_with(DIFFICULTY_PREFIX));
     }
 }
