@@ -151,6 +151,60 @@ impl Node {
     }
 }
 
+pub struct NodeMaster {
+    stop_signal: Arc<Mutex<bool>>,
+    tx_senders: Vec<mpsc::Sender<TxBook>>,
+    bc_receivers: Vec<mpsc::Receiver<Blockchain>>,
+}
+
+impl NodeMaster {
+    pub fn new(n: u8) -> (Self, Vec<Node>) {
+        let stop_signal = Arc::new(Mutex::new(false));
+        let mut tx_senders: Vec<mpsc::Sender<TxBook>> = Vec::new();
+        let mut bc_receivers: Vec<mpsc::Receiver<Blockchain>> = Vec::new();
+        let mut nodes: Vec<Node> = Vec::new();
+        (0..n).for_each(|i| {
+            let (tx_sender, tx_receiver) = mpsc::channel();
+            let (bc_sender, bc_receiver) = mpsc::channel();
+            bc_receivers.push(bc_receiver);
+            tx_senders.push(tx_sender);
+            nodes.push(Node::new(
+                u64::MAX / (n as u64) * (i as u64),
+                stop_signal.clone(),
+                tx_receiver,
+                bc_sender,
+            ));
+        });
+        (
+            Self {
+                stop_signal,
+                tx_senders,
+                bc_receivers,
+            },
+            nodes,
+        )
+    }
+
+    pub fn broadcast_txlist(&self, tx_list: &TxBook) -> Result<(), SendError<TxBook>> {
+        for tx_sender in &self.tx_senders {
+            tx_sender.send(tx_list.clone())?;
+        }
+        Ok(())
+    }
+
+    pub fn stop_nodes(&self) {
+        let mut stop = self.stop_signal.lock().unwrap();
+        *stop = true;
+    }
+
+    pub fn receive_bc(&self) -> Result<Vec<Blockchain>, mpsc::RecvError> {
+        self.bc_receivers
+            .iter()
+            .map(|bc_receiver| bc_receiver.recv())
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::thread;
