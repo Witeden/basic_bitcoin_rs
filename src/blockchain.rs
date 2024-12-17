@@ -1,5 +1,4 @@
 use crate::transaction::{Transaction, TxBook};
-use hex;
 use serde_json;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
@@ -46,7 +45,6 @@ pub(crate) fn mine_block(
         header: next_block_header,
         id,
         transactions: transactions.clone(),
-        hash: "".to_string(),
     };
     while !hash_to_hex_string(&next_block.hash()).starts_with(DIFFICULTY_PREFIX) {
         next_block.increment_nonce();
@@ -87,7 +85,6 @@ pub struct Block {
     header: BlockHeader,
     pub id: u64,
     pub transactions: TxBook,
-    hash: String,
 }
 
 impl Block {
@@ -100,13 +97,11 @@ impl Block {
     ) -> Self {
         let merkle_root = transactions.merkle_root();
         let block_header = BlockHeader::new(timestamp, prev_hash, nonce, merkle_root);
-        let mut block = Block {
+        let block = Block {
             header: block_header,
             id,
             transactions: transactions.clone(),
-            hash: "".to_string(),
         };
-        block.hash = hash_to_hex_string(&block.hash());
         block
     }
 
@@ -146,23 +141,16 @@ impl Block {
         hasher.finalize().as_slice().to_owned()
     }
     pub fn is_valid_next(&self, next: &Block) -> bool {
-        if self.hash != next.header.prev_hash {
+        if hash_to_hex_string(&self.hash()) != next.header.prev_hash {
             return false;
         // Need to check that block begins with difficulty prefix
-        } else if !(hash_to_hex_string(
-            &hex::decode(&next.hash).expect("Could not decode hash from hex."),
-        )
-        .starts_with(DIFFICULTY_PREFIX))
-        {
-            return false;
-        } else if !next.hash.starts_with(DIFFICULTY_PREFIX) {
+        } else if !(hash_to_hex_string(&next.hash()).starts_with(DIFFICULTY_PREFIX)) {
+            println!(" hash does not start with prefix ");
             return false;
         } else if next.id != self.id + 1 {
-            return false;
-        } else if next.hash != hex::encode(next.hash()) {
+            println!(" wrong id ");
             return false;
         }
-
         true
     }
 }
@@ -170,6 +158,15 @@ impl Block {
 #[derive(Debug, Clone)]
 pub struct Blockchain {
     pub blocks: Vec<Block>,
+}
+
+impl PartialEq for Blockchain {
+    fn eq(&self, other: &Self) -> bool {
+        self.blocks
+            .iter()
+            .zip(other.blocks.iter())
+            .all(|(lhs, rhs)| lhs.hash() == rhs.hash())
+    }
 }
 
 impl Blockchain {
