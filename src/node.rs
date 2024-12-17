@@ -142,7 +142,7 @@ impl Node {
                         .unwrap();
                 }
             }
-            if *self.stop_signal.try_lock().unwrap() && self.current_txs.book.is_empty() {
+            if *self.stop_signal.lock().unwrap() && self.current_txs.book.is_empty() {
                 self.bc_channel.send(self.local_bc.clone())?;
                 break;
             }
@@ -244,11 +244,13 @@ mod tests {
             *stop = true;
         }
         handle.join().unwrap().unwrap();
-        if let Ok(blockchain) = bc_receiver.recv() {
+        let received_bc = bc_receiver.recv();
+        assert!(received_bc.is_ok());
+        let blockchain = received_bc.unwrap();
+
             assert!(blockchain.last().is_some());
-            let last_block = blockchain.last().unwrap();
+        let last_block = blockchain.last().unwrap();
             assert_eq!(last_block.transactions, tx_list);
             assert!(hash_to_hex_string(&last_block.hash()).starts_with(DIFFICULTY_PREFIX));
-        }
     }
 }
